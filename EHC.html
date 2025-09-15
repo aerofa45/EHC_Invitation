@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Unlock the ML + Cyber Lab — Snake Quest</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#111837;
+      --grid:#1b244a;
+      --accent:#67e8f9;
+      --accent2:#a78bfa;
+      --packet:#22c55e;
+      --danger:#ef4444;
+      --gold:#f59e0b;
+      --text:#dbeafe;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:radial-gradient(1200px 600px at 70% -10%, #171f44 0%, #0b1020 60%, #090f1f 100%);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,"Helvetica Neue",Arial,sans-serif}
+    .wrap{display:grid;grid-template-columns:1fr;gap:16px;max-width:1000px;margin:20px auto;padding:16px}
+    header{background:linear-gradient(180deg,rgba(255,255,255,.06),transparent);padding:16px 16px;border:1px solid #2a366a;border-radius:16px}
+    header h1{margin:0;font-size:clamp(18px,3.2vw,24px);letter-spacing:.3px}
+    header p{margin:6px 0 0;font-size:14px;opacity:.9}
+    .grid{display:grid;grid-template-columns:1fr 320px;gap:16px}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}}
+    .panel{background:linear-gradient(180deg,rgba(255,255,255,.03),transparent);border:1px solid #2a366a;border-radius:16px;padding:12px}
+    #stageWrap{position:relative;aspect-ratio:1/1;border-radius:14px;overflow:hidden}
+    canvas{width:100%;height:100%;display:block;background:
+      linear-gradient(180deg,rgba(255,255,255,.02),transparent),
+      repeating-linear-gradient(0deg, transparent, transparent 24px, var(--grid) 25px),
+      repeating-linear-gradient(90deg, transparent, transparent 24px, var(--grid) 25px),
+      #0e1531}
+    .hud{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:10px}
+    .hud .stats{display:flex;gap:10px;flex-wrap:wrap}
+    .chip{background:rgba(255,255,255,.06);border:1px solid #2a366a;border-radius:999px;padding:8px 10px;display:flex;align-items:center;gap:8px;font-size:13px}
+    .chip b{color:white}
+    .legend{font-size:13px;opacity:.9;line-height:1.35}
+    .legend .key{display:inline-flex;align-items:center;gap:6px;margin-right:10px}
+    .dot{width:12px;height:12px;border-radius:3px;display:inline-block}
+    .btn{background:linear-gradient(180deg, rgba(103,232,249,.2), rgba(167,139,250,.2));border:1px solid #3b3fb2;color:white;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}
+    .btn:hover{filter:brightness(1.05)}
+    .doorBanner{margin-top:10px;background:linear-gradient(90deg,rgba(245,158,11,.15),transparent);border:1px dashed rgba(245,158,11,.6);color:#ffdd99;padding:10px;border-radius:12px;font-size:13px}
+    .controls{display:none;margin-top:10px;gap:8px;justify-content:center}
+    .controls button{background:#121a3a;border:1px solid #2a366a;color:white;border-radius:10px;width:64px;height:48px;font-weight:700}
+    @media(max-width:680px){.controls{display:flex;flex-wrap:wrap}}
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+    .modal.open{display:flex}
+    .dlg{background:linear-gradient(180deg,rgba(255,255,255,.05),transparent);border:1px solid #3b3fb2;border-radius:16px;max-width:560px;width:100%;padding:18px}
+    .dlg h2{margin:0 0 6px;font-size:22px}
+    .dlg p{margin:6px 0 12px;opacity:.95}
+    .cta{display:flex;gap:10px;flex-wrap:wrap}
+    .cta a,.cta button{all:unset;background:linear-gradient(180deg, rgba(103,232,249,.25), rgba(167,139,250,.25));border:1px solid #3b3fb2;color:white;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+    .cta a:hover,.cta button:hover{filter:brightness(1.07)}
+    footer{opacity:.8;font-size:12px;text-align:center;margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="panel">
+      <h1>🔐 Unlock the inviation — Snake Quest</h1>
+      <p>Collect <b>data packets</b>, deposit them at the <b>lab door</b>, and unlock your invite. Works on desktop (←↑→↓) and mobile (buttons).</p>
+    </header>
+
+    <div class="grid">
+      <section class="panel" id="stageWrap">
+        <canvas id="stage" width="500" height="500" aria-label="Snake game canvas" role="img"></canvas>
+      </section>
+
+      <aside class="panel">
+        <div class="hud">
+          <div class="stats">
+            <div class="chip">Score: <b id="score">0</b></div>
+            <div class="chip">Deposits: <b id="deposits">0</b>/<b id="goal">5</b></div>
+            <div class="chip">Speed: <b id="speed">1x</b></div>
+          </div>
+          <button class="btn" id="restart">Restart ⟳</button>
+        </div>
+        <div class="legend" style="margin-top:8px">
+          <span class="key"><span class="dot" style="background:var(--packet)"></span>Data Packet (+1)</span>
+          <span class="key"><span class="dot" style="background:var(--danger)"></span>Edge/Body = Fail</span>
+          <span class="key"><span class="dot" style="background:var(--gold)"></span>Lab Door (deposit here)</span>
+        </div>
+        <div class="doorBanner">🎯 Deposit <b id="goal2">5</b> packets at the <b>door</b> to unlock your official invite.</div>
+
+        <div class="controls">
+          <button data-dir="up">↑</button>
+          <div style="display:flex;gap:8px">
+            <button data-dir="left">←</button>
+            <button data-dir="down">↓</button>
+            <button data-dir="right">→</button>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;font-size:13px;opacity:.9">Tip: Tap the door after unlocking to claim your spot.</div>
+      </aside>
+    </div>
+
+    <footer>EHC Lab</footer>
+  </div>
+
+  <!-- Modal when door unlocks -->
+  <div class="modal" id="unlockModal" aria-modal="true" role="dialog">
+    <div class="dlg">
+      <h2>🚪 Door Unlocked — You’re In!</h2>
+      <p>
+        You collected enough data and deposited it at the lab door. Ready to join the <b>ML + Cyber Lab</b> and train like a Cybesec Expert of the future?
+      </p>
+      <div class="cta">
+        <a id="joinLink" href="#" target="_blank" rel="noopener">🔗 Claim Your Invite</a>
+        <button id="keepPlaying">Keep Playing</button>
+      </div>
+      <hr style="margin:16px 0;border:none;border-top:1px solid #2a366a">
+      <h3 style="margin:0 0 6px;font-size:18px">🔥 After You Unlock</h3>
+      <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.45">
+        <li>Access hands-on projects like <b>Log Anomaly Detection</b> & <b>Network Flow Classification</b>.</li>
+        <li>Compare ML detection vs. Suricata IDS in real-world scenarios.</li>
+        <li>Workflows designed to mirror <b>SOC Analyst</b> skills — log triage, anomaly spotting, ML integration.</li>
+        <li>Portfolio-ready experience you can showcase in internships & interviews.</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================
+       Config
+       ========================== */
+    const GRID = 25;              // grid cells per side
+    const CELL = 20;              // pixels per cell
+    const START_SPEED_MS = 120;   // lower = faster
+    const MIN_SPEED_MS = 70;
+    const SPEED_STEP = 5;
+    const GOAL_DEPOSITS = 5;      // deposits needed to unlock
+
+    // 🔗 Replace with your real signup link
+    const SIGNUP_URL = "https://discord.com/invite/4UsFxcBU"; // TODO
+
+    // Door placement (right-side column)
+    const DOOR_COL = GRID - 2;    // second-to-last column
+    const DOOR_WIDTH = 1;         // width in cells
+
+    // Colors from CSS vars (fallbacks included)
+    const COLORS = {
+      snakeHead: "#a78bfa",
+      snakeBody: "#64748b",
+      packet: getComputedStyle(document.documentElement).getPropertyValue('--packet').trim() || '#22c55e',
+      door: getComputedStyle(document.documentElement).getPropertyValue('--gold').trim() || '#f59e0b',
+      fail: getComputedStyle(document.documentElement).getPropertyValue('--danger').trim() || '#ef4444',
+      grid: getComputedStyle(document.documentElement).getPropertyValue('--grid').trim() || '#1b244a'
+    };
+
+    /* ==========================
+       State
+       ========================== */
+    const canvas = document.getElementById('stage');
+    canvas.width = GRID * CELL;
+    canvas.height = GRID * CELL;
+    const ctx = canvas.getContext('2d');
+
+    let snake, dir, nextDir, packet, score, deposits, speedMs, timer, unlocked;
+
+    function reset() {
+      snake = [ {x: 3, y: 12}, {x:2,y:12}, {x:1,y:12} ];
+      dir = {x:1, y:0};
+      nextDir = {...dir};
+      packet = spawnPacket();
+      score = 0;
+      deposits = 0;
+      speedMs = START_SPEED_MS;
+      unlocked = false;
+      updateHud();
+      setJoinLink();
+      if (timer) clearInterval(timer);
+      timer = setInterval(tick, speedMs);
+      draw();
+    }
+
+    function setJoinLink(){
+      const link = document.getElementById('joinLink');
+      const url = new URL(SIGNUP_URL, location.origin);
+      url.searchParams.set('utm_source','email');
+      url.searchParams.set('utm_medium','game');
+      url.searchParams.set('utm_campaign','lab_invite');
+      link.href = url.toString();
+    }
+
+    function spawnPacket(){
+      let x, y;
+      do {
+        x = Math.floor(Math.random()*GRID);
+        y = Math.floor(Math.random()*GRID);
+      } while (isOnSnake(x,y) || (x>=DOOR_COL && x<DOOR_COL+DOOR_WIDTH));
+      return {x,y};
+    }
+
+    function isOnSnake(x,y){
+      return snake.some(seg => seg.x===x && seg.y===y);
+    }
+
+    function tick(){
+      // commit queued direction
+      dir = nextDir;
+      const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+
+      // bounds
+      if (head.x < 0 || head.y < 0 || head.x >= GRID || head.y >= GRID) {
+        return gameOver();
+      }
+      // self-collision
+      if (snake.some((s,i)=> i>0 && s.x===head.x && s.y===head.y)) {
+        return gameOver();
+      }
+
+      snake.unshift(head);
+
+      // collected packet
+      if (head.x === packet.x && head.y === packet.y) {
+        score++;
+        maybeSpeedUp();
+        packet = spawnPacket();
+      } else {
+        snake.pop();
+      }
+
+      // deposit when at door
+      if (head.x >= DOOR_COL && head.x < DOOR_COL + DOOR_WIDTH) {
+        if (score > 0) {
+          deposits += score; // deposit all carried packets
+          score = 0;
+          maybeUnlock();
+        }
+      }
+
+      draw();
+      updateHud();
+    }
+
+    function maybeSpeedUp(){
+      speedMs = Math.max(MIN_SPEED_MS, speedMs - SPEED_STEP);
+      clearInterval(timer);
+      timer = setInterval(tick, speedMs);
+    }
+
+    function maybeUnlock(){
+      if (!unlocked && deposits >= GOAL_DEPOSITS) {
+        unlocked = true;
+        openModal();
+      }
+    }
+
+    function gameOver(){
+      clearInterval(timer);
+      flash(COLORS.fail);
+      setTimeout(()=>reset(), 900);
+    }
+
+    function flash(color){
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.25;
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.restore();
+    }
+
+    function draw(){
+      // clear previous frame to prevent ghosting/trails across rounds
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      // draw door strip
+      for (let y=0; y<GRID; y++){
+        ctx.fillStyle = COLORS.door;
+        ctx.globalAlpha = 0.15;
+        ctx.fillRect(DOOR_COL*CELL, y*CELL, DOOR_WIDTH*CELL, CELL);
+      }
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = COLORS.door;
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(DOOR_COL*CELL+2, 2, DOOR_WIDTH*CELL-4, GRID*CELL-4);
+      ctx.globalAlpha = 1;
+
+      // packet
+      drawCell(packet.x, packet.y, COLORS.packet, 6);
+
+      // snake
+      snake.forEach((seg,idx)=>{
+        const isHead = idx===0;
+        drawCell(seg.x, seg.y, isHead ? COLORS.snakeHead : COLORS.snakeBody, isHead? 5:8);
+      });
+    }
+
+    function drawCell(x,y,color,pad=4){
+      const px = x*CELL + pad;
+      const py = y*CELL + pad;
+      const size = CELL - pad*2;
+      ctx.fillStyle = color;
+      ctx.fillRect(px,py,size,size);
+      // inner shine
+      ctx.fillStyle = 'rgba(255,255,255,.12)';
+      ctx.fillRect(px,py,size,Math.max(2, size*0.18));
+    }
+
+    function updateHud(){
+      document.getElementById('score').textContent = score;
+      document.getElementById('deposits').textContent = deposits;
+      document.getElementById('goal').textContent = GOAL_DEPOSITS;
+      document.getElementById('goal2').textContent = GOAL_DEPOSITS;
+      const speedRatio = (START_SPEED_MS / speedMs).toFixed(1);
+      document.getElementById('speed').textContent = speedRatio + 'x';
+    }
+
+    // Direction handling with reverse-protection
+    function setDir(nx,ny){
+      if (nx === -dir.x && ny === -dir.y) return; // prevent 180° turns
+      nextDir = {x:nx, y:ny};
+    }
+
+    // Keyboard controls
+    window.addEventListener('keydown', e=>{
+      if (e.key==='ArrowLeft') setDir(-1,0);
+      else if (e.key==='ArrowRight') setDir(1,0);
+      else if (e.key==='ArrowUp') setDir(0,-1);
+      else if (e.key==='ArrowDown') setDir(0,1);
+    });
+
+    // On-screen controls
+    document.querySelectorAll('.controls button').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const d = btn.getAttribute('data-dir');
+        if (d==='left') setDir(-1,0);
+        if (d==='right') setDir(1,0);
+        if (d==='up') setDir(0,-1);
+        if (d==='down') setDir(0,1);
+      });
+    });
+
+    // Restart button
+    document.getElementById('restart').addEventListener('click', reset);
+
+    // Modal controls
+    const modal = document.getElementById('unlockModal');
+    function openModal(){ modal.classList.add('open'); }
+    function closeModal(){ modal.classList.remove('open'); }
+    document.getElementById('keepPlaying').addEventListener('click', closeModal);
+
+    // Click on door after unlock → open signup
+    canvas.addEventListener('click', (e)=>{
+      if (!unlocked) return;
+      const rect = canvas.getBoundingClientRect();
+      const cx = Math.floor((e.clientX - rect.left) / rect.width * GRID);
+      if (cx >= DOOR_COL && cx < DOOR_COL + DOOR_WIDTH){
+        window.open(document.getElementById('joinLink').href, '_blank');
+      }
+    });
+
+    // Boot
+    reset();
+  </script>
+</body>
+</html>
